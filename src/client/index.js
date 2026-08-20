@@ -17,7 +17,7 @@ let isOpen = false
 const openListeners = new Set()
 function setOpen(value) {
   isOpen = value
-  for (const listener of [...openListeners]) listener()
+  for (const listener of [...openListeners]) listener(isOpen)
 }
 function subscribeOpen(listener) {
   openListeners.add(listener)
@@ -159,7 +159,7 @@ function TetrisOpenButton() {
 // ===== Game =====
 function TetrisGame() {
   const [open, setOpenState] = React.useState(isOpen)
-  React.useEffect(() => subscribeOpen(setOpenState), [])
+  React.useEffect(() => subscribeOpen((value) => setOpenState(value)), [])
 
   const boardRef = React.useRef(null)
   const holdRef = React.useRef(null)
