@@ -1,0 +1,7 @@
+# dsh-tetris bundle patch: one browser plugin row.
+# A bundle patch replaces the targeted row's whole config; this package owns
+# the single `dsh-tetris` row and ships its browser half through
+# exports["./client"] (built to lib/client.js).
+- insert:
+    - id: dsh-tetris
+      name: dsh-tetris

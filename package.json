@@ -1,0 +1,50 @@
+{
+  "name": "dsh-tetris",
+  "version": "0.3.0",
+  "description": "俄罗斯方块 DSH 插件：在 DSH 对话流中直接游玩的经典 Tetris，带跨玩家共享排行榜。Classic Tetris as a DSH plugin with a unified cross-player leaderboard.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepare": "tsdown"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "react": "^18.2.0",
+    "tsdown": "^0.22.14"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "tetris",
+    "game",
+    "leaderboard"
+  ],
+  "license": "MIT"
+}
