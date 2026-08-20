@@ -162,7 +162,7 @@ return {
           board: null, score: 0, level: 1, lines: 0,
           gameOver: false, paused: false, started: false,
           currentPiece: null, ghostY: 0, holdPiece: null, canHold: true,
-          showGhost: true, soundEnabled: true, bgmEnabled: true,
+          showGhost: true, soundEnabled: false, bgmEnabled: false,
           bag: [], nextPieces: [],
           dropInterval: 1000, dropTimer: 0, lastTime: 0,
           lockTimer: 0, lockMoves: 0,
@@ -765,10 +765,10 @@ return {
         title == null ? null : React.createElement('h3', null, title),
         content,
       )
-      const toggleRow = (label, inputRef) => React.createElement('div', { className: 'toggle-row' },
+      const toggleRow = (label, inputRef, defaultOn) => React.createElement('div', { className: 'toggle-row' },
         React.createElement('label', null, label),
         React.createElement('label', { className: 'toggle-switch' },
-          React.createElement('input', { ref: inputRef, type: 'checkbox', defaultChecked: true }),
+          React.createElement('input', { ref: inputRef, type: 'checkbox', defaultChecked: defaultOn !== false }),
           React.createElement('span', { className: 'toggle-slider' }),
         ),
       )
@@ -812,9 +812,9 @@ return {
           // Right panel
           React.createElement('div', { className: 'side-panel' },
             box('下一个', React.createElement('canvas', { ref: nextRef, width: 100, height: 280 })),
-            box(null, toggleRow('幽灵', ghostToggleRef)),
-            box(null, toggleRow('音效', soundToggleRef)),
-            box(null, toggleRow('BGM', bgmToggleRef)),
+            box(null, toggleRow('幽灵', ghostToggleRef, true)),
+            box(null, toggleRow('音效', soundToggleRef, false)),
+            box(null, toggleRow('BGM', bgmToggleRef, false)),
           ),
         ),
       )
