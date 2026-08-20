@@ -1,0 +1,18 @@
+# ============================================================
+# awesome-dsh-plugin 上架提交物料
+# ------------------------------------------------------------
+# 提交流程（见 https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md）：
+#   1. 本仓库满足条件（创建满 1 天 + ≥10 commits + dsh-plugin topic 已加）
+#   2. fork awesome-dsh-plugin 仓库
+#   3. 新增文件 data/plugins/jasoncanada77-star__dsh-tetris.yml（内容即下方 YAML）
+#   4. 仓库内运行 `npm ci && node scripts/generate-readme.mjs` 重新生成两个 README
+#   5. 提交 PR（只改自己这一个条目）
+# CI 通过后维护者人工评审，通常一天内自动收录进 dshmarket。
+# ============================================================
+
+url: https://github.com/jasoncanada77-star/dsh-tetris
+name: jasoncanada77-star/dsh-tetris
+category: fun
+description:
+  en: 'Classic Tetris as a DSH bundle: playable in a full-screen overlay with a shared cross-player leaderboard.'
+  zh: '经典俄罗斯方块 DSH 插件：全屏浮层直接游玩，内置跨玩家共享排行榜。'
