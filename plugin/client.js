@@ -100,6 +100,30 @@ return {
       .tetris-plugin-root .toggle-switch input:checked + .toggle-slider::before {
         transform: translateX(18px); background: #fff;
       }
+      .tetris-plugin-root .tp-subtitle {
+        font-size: 13px; color: var(--tp-dim); letter-spacing: 2px;
+        margin-bottom: 12px; text-shadow: 0 0 8px rgba(100,100,255,0.35);
+      }
+      .tetris-plugin-root .tp-name-input {
+        width: 100%; background: #0d0d20; border: 1px solid var(--tp-border);
+        border-radius: 6px; color: #fff; padding: 4px 8px; font-size: 12px;
+        margin-bottom: 6px; outline: none;
+      }
+      .tetris-plugin-root .tp-name-input:focus { border-color: var(--tp-accent); }
+      .tetris-plugin-root .tp-board-list { text-align: left; }
+      .tetris-plugin-root .tp-board-empty {
+        font-size: 11px; color: #555; padding: 4px 0; text-align: center;
+      }
+      .tetris-plugin-root .tp-board-row {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 12px; padding: 2px 0; color: var(--tp-dim);
+      }
+      .tetris-plugin-root .tp-board-rank { width: 22px; text-align: center; }
+      .tetris-plugin-root .tp-board-name {
+        flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .tetris-plugin-root .tp-board-score { color: #fff; font-weight: bold; }
+      .tetris-plugin-root .tp-board-first .tp-board-score { color: #ffcc44; }
     `)
 
     function TetrisGame() {
@@ -120,6 +144,14 @@ return {
       const bgmToggleRef = React.useRef(null)
       const startBtnRef = React.useRef(null)
       const restartBtnRef = React.useRef(null)
+      const boardListRef = React.useRef(null)
+      const nameInputRef = React.useRef(null)
+
+      // Player nickname for the shared leaderboard (persisted locally).
+      const NAME_KEY = 'tetris_player_name'
+      function loadPlayerName() {
+        try { return window.localStorage.getItem(NAME_KEY) || '' } catch (e) { return '' }
+      }
 
       React.useEffect(() => {
         // ===== Constants =====
@@ -157,6 +189,18 @@ return {
         const BGM_SCHEDULE_AHEAD = 0.12
         const BGM_TEMPO = 0.26
 
+        // ===== Shared leaderboard (unified across every player) =====
+        // JSON-REST document at a free key-value store: kvdb.io (browser CORS
+        // enabled). Swap these constants to point at any JSON document store
+        // (jsonblob, a Cloudflare Worker, …) without touching game logic.
+        const LEADERBOARD = {
+          readUrl: 'https://kvdb.io/Xpm4Y6WXXuaEWMmLKQvFe3/board',
+          writeUrl: 'https://kvdb.io/Xpm4Y6WXXuaEWMmLKQvFe3/board',
+          topCount: 8,
+          maxStore: 15,
+        }
+        const PENDING_KEY = 'tetris_pending_scores'
+
         // ===== Mutable game state =====
         const G = {
           board: null, score: 0, level: 1, lines: 0,
@@ -173,6 +217,7 @@ return {
           bgmNextMelodyTime: 0, bgmNextBassTime: 0,
           rafId: null,
           keys: {}, repeatTimers: {},
+          disposed: false,
         }
 
         const canvas = boardRef.current
@@ -578,6 +623,113 @@ return {
           highScoreRef.current.textContent = Math.max(G.highScore, G.score)
         }
 
+        // ===== Shared Leaderboard =====
+        function loadPending() {
+          try { return JSON.parse(window.localStorage.getItem(PENDING_KEY)) || [] } catch (e) { return [] }
+        }
+        function savePending(list) {
+          try { window.localStorage.setItem(PENDING_KEY, JSON.stringify(list)) } catch (e) { /* ignore */ }
+        }
+        function renderBoard(list) {
+          const el = boardListRef.current
+          if (el === null) return
+          el.textContent = ''
+          if (!Array.isArray(list) || list.length === 0) {
+            const div = document.createElement('div')
+            div.className = 'tp-board-empty'
+            div.textContent = list === null ? '排行榜离线，本局分数已存本地' : '暂无记录，快来当第一！'
+            el.appendChild(div)
+            return
+          }
+          list.slice(0, LEADERBOARD.topCount).forEach((item, i) => {
+            const row = document.createElement('div')
+            row.className = 'tp-board-row' + (i === 0 ? ' tp-board-first' : '')
+            const rank = document.createElement('span')
+            rank.className = 'tp-board-rank'
+            rank.textContent = ['🥇', '🥈', '🥉'][i] || String(i + 1)
+            const nm = document.createElement('span')
+            nm.className = 'tp-board-name'
+            nm.textContent = String((item && item.name) || '玩家')
+            const sc = document.createElement('span')
+            sc.className = 'tp-board-score'
+            sc.textContent = String(item && item.score != null ? item.score : 0)
+            row.appendChild(rank); row.appendChild(nm); row.appendChild(sc)
+            el.appendChild(row)
+          })
+        }
+        function writeBoard(list) {
+          return window.fetch(LEADERBOARD.writeUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(list),
+          }).then((res) => {
+            if (res.ok) return res
+            if (res.status === 404) {
+              // Key does not exist yet — first write ever: create it with POST.
+              return window.fetch(LEADERBOARD.writeUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(list),
+              })
+            }
+            return res
+          })
+        }
+        function refreshBoard() {
+          window.fetch(LEADERBOARD.readUrl)
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null)
+            .then((raw) => {
+              if (G.disposed) return
+              let list = Array.isArray(raw) ? raw : null
+              if (list !== null) {
+                // Network is up: flush scores saved while offline.
+                const pending = loadPending()
+                if (pending.length > 0) {
+                  list = [...list, ...pending]
+                    .sort((a, b) => (b.score - a.score) || (a.ts - b.ts))
+                    .slice(0, LEADERBOARD.maxStore)
+                  savePending([])
+                  writeBoard(list).catch(() => { /* offline again */ })
+                }
+              }
+              renderBoard(list)
+            })
+        }
+        function submitScore() {
+          if (G.score <= 0) return
+          let name = nameInputRef.current ? nameInputRef.current.value.trim() : ''
+          if (!name) name = '玩家'
+          name = name.slice(0, 12)
+          try { window.localStorage.setItem(NAME_KEY, name) } catch (e) { /* ignore */ }
+          const entry = { name, score: G.score, ts: Date.now() }
+          window.fetch(LEADERBOARD.readUrl)
+            .then((res) => (res.ok ? res.json() : []))
+            .catch(() => null)
+            .then((current) => {
+              if (G.disposed) return null
+              if (current === null) {
+                // Fully offline: park the score locally, flush on next success.
+                const pending = loadPending()
+                pending.push(entry)
+                savePending(pending.slice(-10))
+                refreshBoard()
+                return null
+              }
+              const list = (Array.isArray(current) ? current : []).concat(entry)
+              list.sort((a, b) => (b.score - a.score) || (a.ts - b.ts))
+              return writeBoard(list.slice(0, LEADERBOARD.maxStore)).then((res) => {
+                if (!res.ok) {
+                  const pending = loadPending()
+                  pending.push(entry)
+                  savePending(pending.slice(-10))
+                }
+                return refreshBoard()
+              })
+            })
+            .catch(() => { /* leaderboard offline; game continues */ })
+        }
+
         // ===== Overlays =====
         function showGameOver() {
           stopBGM()
@@ -587,6 +739,7 @@ return {
           finalScoreRef.current.textContent = '最终分数: ' + G.score
           newRecordRef.current.classList.toggle('hidden', !isNewRecord)
           gameOverOverlayRef.current.classList.remove('hidden')
+          submitScore()
         }
 
         // ===== Game Loop =====
@@ -623,6 +776,7 @@ return {
           G.dropInterval = 1000; G.dropTimer = 0; G.lastTime = 0
           G.lockTimer = 0; G.lockMoves = 0
           loadHighScore()
+          refreshBoard()
           updateUI()
           drawHold()
           ensureNext()
@@ -712,9 +866,15 @@ return {
           if (G.bgmEnabled && G.started && !G.gameOver && !G.paused) startBGM()
           else stopBGM()
         }
+        const onNameChange = () => {
+          if (nameInputRef.current) {
+            try { window.localStorage.setItem(NAME_KEY, nameInputRef.current.value.trim()) } catch (e) { /* ignore */ }
+          }
+        }
         ghostToggleRef.current.addEventListener('change', onGhostChange)
         soundToggleRef.current.addEventListener('change', onSoundChange)
         bgmToggleRef.current.addEventListener('change', onBgmChange)
+        nameInputRef.current.addEventListener('change', onNameChange)
 
         // ===== Start / Restart =====
         const onStart = () => {
@@ -741,6 +901,7 @@ return {
 
         return () => {
           // ---- cleanup: every side effect of this run must be reversible ----
+          G.disposed = true
           if (G.rafId) window.cancelAnimationFrame(G.rafId)
           stopBGM()
           for (const code in G.repeatTimers) {
@@ -752,6 +913,7 @@ return {
           ghostToggleRef.current.removeEventListener('change', onGhostChange)
           soundToggleRef.current.removeEventListener('change', onSoundChange)
           bgmToggleRef.current.removeEventListener('change', onBgmChange)
+          nameInputRef.current.removeEventListener('change', onNameChange)
           startBtnRef.current.removeEventListener('click', onStart)
           restartBtnRef.current.removeEventListener('click', onRestart)
           if (G.audioCtx && typeof G.audioCtx.close === 'function') {
@@ -789,6 +951,7 @@ return {
             React.createElement('canvas', { ref: boardRef, className: 'tp-board', width: 300, height: 600 }),
             React.createElement('div', { ref: startOverlayRef, className: 'overlay' },
               React.createElement('h2', null, '俄罗斯方块'),
+              React.createElement('div', { className: 'tp-subtitle' }, 'AI干活~我摸鱼！'),
               React.createElement('p', null, '经典方块消除游戏'),
               React.createElement('button', { ref: startBtnRef, className: 'btn', type: 'button' }, '开始游戏'),
               React.createElement('div', { className: 'controls-info' },
@@ -815,6 +978,10 @@ return {
             box(null, toggleRow('幽灵', ghostToggleRef, true)),
             box(null, toggleRow('音效', soundToggleRef, false)),
             box(null, toggleRow('BGM', bgmToggleRef, false)),
+            box('排行榜',
+              React.createElement('input', { ref: nameInputRef, className: 'tp-name-input', type: 'text', maxLength: 12, defaultValue: loadPlayerName(), placeholder: '输入昵称上榜' }),
+              React.createElement('div', { ref: boardListRef, className: 'tp-board-list' }),
+            ),
           ),
         ),
       )

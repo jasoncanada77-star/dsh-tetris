@@ -17,6 +17,17 @@
 - ⏱️ **锁定延迟**：落地后 500ms 内仍可移动/旋转
 - 🎵 **音效 + BGM**：Web Audio 合成《Korobeiniki》主题曲（`M`/`B` 开关，**默认关闭**，可随时开启）
 - 🏆 **最高分持久化**：localStorage 保存历史最高分
+- 🌍 **跨玩家排行榜**：所有安装者的分数进同一张榜（输入昵称上榜，离线自动暂存、联网后补交）
+- 😎 **副标题**：AI干活~我摸鱼！
+
+## 排行榜说明
+
+- 游戏结束（分数 > 0）后自动把本局分数提交到共享排行榜，右侧「排行榜」面板实时展示 **Top 8**
+- 在「排行榜」面板输入**昵称**（最长 12 字，本地记住，默认「玩家」）即可上榜
+- **离线降级**：网络不可用时分数存入本地待提交队列，下次联网自动补交；排行榜显示「离线」但游戏不受影响
+- **后端**：默认指向免费的 [kvdb.io](https://kvdb.io) JSON 键值存储（浏览器 CORS 可用），单榜保留最近 15 条高分
+- **更换后端**：改 `plugin/client.js` 顶部 `LEADERBOARD.readUrl` / `writeUrl` 常量即可指向任意 JSON 文档存储（jsonblob、自建 Cloudflare Worker 等），无需改游戏逻辑
+- ⚠️ 这是娱乐性功能：分数由客户端上报、无鉴权，防不了作弊；免费 KV 服务无 SLA，仅供游玩
 
 ## 安装方法（给 DSH 玩家）
 
@@ -61,8 +72,9 @@
 - **平台**：Client 半部（纯浏览器侧，无 Host 依赖）
 - **渲染位置**：`tool.view.cordis` Slot（`key: 'self'`），渲染在最新 `cordis_run` 卡片内
 - **依赖的服务**：`timer`（`ctx.timeout` / `ctx.interval`）——DSH 遮蔽了 `setTimeout`/`setInterval`，定时器一律走 Cordis 定时器服务，卸载自动清理
-- **可用的浏览器全局**：`window`、`document`、`requestAnimationFrame`、`localStorage`、`AudioContext`（未被 DSH 闭包遮蔽）
-- **生命周期**：所有副作用（键盘监听、动画帧、BGM 定时器、AudioContext）都在 `useEffect` cleanup 中完整回收，`cordis_stop` / 更新 / 卸载不会残留
+- **可用的浏览器全局**：`window`、`document`、`requestAnimationFrame`、`localStorage`、`AudioContext`、`window.fetch`（未被 DSH 闭包遮蔽）
+- **排行榜**：`window.fetch` 直连 JSON-REST 端点（KV 文档存储），游戏逻辑与传输解耦；异步请求在卸载后通过 `disposed` 标记丢弃结果
+- **生命周期**：所有副作用（键盘监听、动画帧、BGM 定时器、AudioContext、排行榜请求）都在 `useEffect` cleanup 中完整回收，`cordis_stop` / 更新 / 卸载不会残留
 - **改动对照**：原版单文件 `index.html`（见 [`original/`](original/)）→ 移植为 React 组件 + `styles.insert` CSS，游戏引擎逻辑逐行保留
 
 ## 目录结构
